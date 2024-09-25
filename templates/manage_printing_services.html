@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Printing Services</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center">Manage Printing Services</h1>
+        
+        <!-- Navigation buttons -->
+        <a href="{{ url_for('another_dashboard') }}" class="btn btn-secondary mb-3">Back to Dashboard</a>
+        <a href="{{ url_for('add_print_service') }}" class="btn btn-secondary mb-3">Add Print Service</a>
+        <a href="{{ url_for('checkout_print_service') }}" class="btn btn-secondary mb-3">Checkout Print Service</a>
+
+        <!-- Button to trigger Ink Type Modal -->
+        <button type="button" class="btn btn-secondary mb-3" data-toggle="modal" data-target="#inkTypeModal">
+            Add Ink Type
+        </button>
+
+        <!-- Button to trigger Paper Type Modal -->
+        <button type="button" class="btn btn-secondary mb-3" data-toggle="modal" data-target="#paperTypeModal">
+            Add Paper Type
+        </button>
+
+        <!-- Print Services Table -->
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Service Type</th>
+                    <th>Price Per Page</th>
+                    <th>Admin Price Override</th>
+                    <th>Date/Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for service in print_services %}
+                <tr>
+                    <td>{{ service.id }}</td>
+                    <td>{{ service.service_type }}</td>
+                    <td>{{ service.price_per_page }}</td>
+                    <td>{{ service.admin_price_override if service.admin_price_override else 'N/A' }}</td>
+                    <td>{{ service.timestamp }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Ink Type Modal -->
+    <div class="modal fade" id="inkTypeModal" tabindex="-1" role="dialog" aria-labelledby="inkTypeModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="inkTypeModalLabel">Add New Ink Type</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <form method="POST" action="{{ url_for('add_ink_type') }}">
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="new_ink_type_name">Ink Type Name</label>
+                            <input type="text" class="form-control" id="new_ink_type_name" name="new_ink_type_name" placeholder="Enter new ink type" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Add Ink Type</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paper Type Modal -->
+    <div class="modal fade" id="paperTypeModal" tabindex="-1" role="dialog" aria-labelledby="paperTypeModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="paperTypeModalLabel">Add New Paper Type</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <form method="POST" action="{{ url_for('add_paper_type') }}">
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="size">Paper Size</label>
+                            <input type="text" class="form-control" id="size" name="size" placeholder="Enter paper size (e.g., A4, F4)" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="description">Description</label>
+                            <input type="text" class="form-control" id="description" name="description" placeholder="Enter paper description (optional)">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Add Paper Type</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap and jQuery scripts for modal functionality -->
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+
+</body>
+</html>
