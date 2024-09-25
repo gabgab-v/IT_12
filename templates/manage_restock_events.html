@@ -55,21 +55,6 @@
                         <h5>Restock Information</h5>
 
                         <div class="form-group">
-                            <label for="restock_amount">Restock Amount</label>
-                            <input type="number" class="form-control" id="restock_amount" name="restock_amount" placeholder="Enter restock amount" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="restock_location">Restock Location</label>
-                            <input type="text" class="form-control" id="restock_location" name="restock_location" placeholder="Enter restock location" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="amount_spent">Amount Spent on Restock</label>
-                            <input type="number" class="form-control" id="amount_spent" name="amount_spent" placeholder="Enter amount spent on restock" required>
-                        </div>
-
-                        <div class="form-group">
                             <label for="restock_type">Restock Type</label>
                             <select class="form-control" id="restock_type" name="restock_type" required onchange="showInventoryFields()">
                                 <option value="">Select Restock Type</option>
@@ -78,6 +63,21 @@
                                 <option value="load">Load</option>
                                 <option value="gcash">Gcash</option> <!-- For Load restocking -->
                             </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="restock_amount">Restock Amount</label>
+                            <input type="number" class="form-control" id="restock_amount" name="restock_amount" placeholder="Enter restock amount" required>
+                        </div>
+
+                        <div class="form-group" id="restock-location-field">
+                            <label for="restock_location">Restock Location</label>
+                            <input type="text" class="form-control" id="restock_location" name="restock_location" placeholder="Enter restock location" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="amount_spent">Amount Spent on Restock</label>
+                            <input type="number" class="form-control" id="amount_spent" name="amount_spent" placeholder="Enter amount spent on restock" required>
                         </div>
 
                         <!-- Ink Type Selection (hidden by default) -->
@@ -90,15 +90,18 @@
                             </select>
                         </div>
 
-                        <!-- Paper Type Selection (hidden by default) -->
+                        <!-- Paper Type Selection (for paper restock) -->
                         <div class="form-group" id="paper-type-field" style="display: none;">
                             <label for="paper_type_id">Select Paper Type</label>
-                            <select class="form-control" id="paper_type_id" name="paper_type_id">
+                            <select class="form-control" id="paper_type_id" name="paper_type_id" required>
                                 {% for paper in paper_types %}
                                     <option value="{{ paper.id }}">{{ paper.size }} - {{ paper.description }}</option>
                                 {% endfor %}
                             </select>
                         </div>
+
+
+
                     </div>
 
                     <div class="modal-footer">
@@ -116,20 +119,24 @@
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
 
     <script>
-        function showInventoryFields() {
-            const restockType = document.getElementById('restock_type').value;
-            const inkField = document.getElementById('ink-type-field');
-            const paperField = document.getElementById('paper-type-field');
 
-            inkField.style.display = 'none';
-            paperField.style.display = 'none';
+            function showInventoryFields() {
+                const restockType = document.getElementById('restock_type').value;
+                const inkField = document.getElementById('ink-type-field');
+                const paperField = document.getElementById('paper-type-field');
 
-            if (restockType === 'ink') {
-                inkField.style.display = 'block';
-            } else if (restockType === 'paper') {
-                paperField.style.display = 'block';
+                // Reset visibility
+                inkField.style.display = 'none';
+                paperField.style.display = 'none';
+
+                if (restockType === 'ink') {
+                    inkField.style.display = 'block';  // Show ink-related fields
+                } else if (restockType === 'paper') {
+                    paperField.style.display = 'block';  // Show paper-related fields
+                }
             }
-        }
+
+
     </script>
 
 </body>

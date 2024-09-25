@@ -1199,8 +1199,48 @@ def add_loading_service():
 # Manage Printing Services
 @app.route('/manage_printing_services')
 def manage_printing_services():
-    print_services = PrintService.query.all()
-    return render_template('manage_printing_services.html', print_services=print_services)
+    print_services = PrintService.query.all()  # Fetch all print services
+    paper_types = PaperType.query.all()        # Fetch all available paper types
+    
+    # Fetch current paper inventory for each paper type
+    paper_inventory = PaperInventory.query.all()
+
+    # Combine paper types with their inventory data
+    paper_data = []
+    for paper_type in paper_types:
+        inventory = PaperInventory.query.filter_by(paper_type_id=paper_type.id).first()
+        paper_data.append({
+            'type': f"{paper_type.size} - {paper_type.description}",
+            'total_amount': inventory.rim_count if inventory else 0  # Default to 0 if no inventory found
+        })
+    
+    return render_template('manage_printing_services.html', 
+                           print_services=print_services, 
+                           paper_inventory=paper_data  # Pass combined data to the template
+                           )
+
+# @app.route('/manage_printing_services')
+# def manage_printing_services():
+#     # Fetch all print services
+#     print_services = PrintService.query.all()
+
+#     # Fetch paper inventory (join with PaperType for type and description)
+#     paper_inventory = db.session.query(
+#         PaperType.size, PaperType.description, PaperInventory.rim_count
+#     ).join(PaperInventory, PaperType.id == PaperInventory.paper_type_id).all()
+
+#     # Calculate total paper amount (rim_count * 500 sheets per rim)
+#     paper_inventory_data = [
+#         {
+#             "type": f"{paper.size} - {paper.description}",
+#             "total_amount": paper.rim_count * 500  # Assuming 500 sheets per rim
+#         }
+#         for paper in paper_inventory
+#     ]
+
+#     return render_template('manage_printing_services.html', print_services=print_services, paper_inventory=paper_inventory_data)
+
+
 
 @app.route('/checkout_print_service', methods=['GET', 'POST'])
 def checkout_print_service():
@@ -1534,16 +1574,20 @@ def add_restock():
             db.session.add(ink_inventory)
 
     # Handle paper restock
+    # Handle paper restock
     elif restock_type == 'paper':
         paper_type_id = request.form.get('paper_type_id')
-        print(f"Paper Type ID: {paper_type_id}")
         
         if not paper_type_id:
             flash('Please select a paper type!', 'danger')
             return redirect(url_for('manage_restock_events'))
 
-        paper_inventory = PaperInventory.query.filter_by(paper_type_id=paper_type_id).first()
+        # Use restock_location here
+        restock_location = request.form.get('restock_location')
 
+        # Fetch the paper inventory by paper_type_id
+        paper_inventory = PaperInventory.query.filter_by(paper_type_id=paper_type_id).first()
+        
         if paper_inventory:
             # Update the existing paper inventory
             paper_inventory.rim_count += restock_amount
@@ -1556,10 +1600,9 @@ def add_restock():
                 individual_paper_count=restock_amount * 500,  # Assuming 500 sheets per rim
                 amount_spent=amount_spent,
                 paper_type_id=paper_type_id,
-                location_id=request.form['location_id']
+                location_id=restock_location  # Ensure restock location is used here
             )
             db.session.add(paper_inventory)
-
 
     # Handle load and GCash restocks
     elif restock_type in ['load', 'gcash']:

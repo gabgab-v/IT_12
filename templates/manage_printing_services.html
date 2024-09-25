@@ -48,6 +48,26 @@
                 {% endfor %}
             </tbody>
         </table>
+
+        <!-- Paper Inventory Table -->
+        <h2 class="mt-5">Paper Inventory</h2>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Paper Type</th>
+                    <th>Total Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for paper in paper_inventory %}
+                <tr>
+                    <td>{{ paper.type }}</td>
+                    <td>{{ paper.total_amount }} sheets</td>  <!-- Display total sheets for the paper type -->
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
     </div>
 
     <!-- Ink Type Modal -->
