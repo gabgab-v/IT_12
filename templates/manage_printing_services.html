@@ -55,18 +55,22 @@
             <thead>
                 <tr>
                     <th>Paper Type</th>
-                    <th>Total Amount</th>
+                    <th>Rim Count</th>
+                    <th>Individual Sheets</th>
                 </tr>
             </thead>
             <tbody>
                 {% for paper in paper_inventory %}
                 <tr>
                     <td>{{ paper.type }}</td>
-                    <td>{{ paper.total_amount }} sheets</td>  <!-- Display total sheets for the paper type -->
+                    <td>{{ paper.rim_count }} rims</td>
+                    <td>{{ paper.individual_paper_count }} sheets</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        
+        
 
     </div>
 

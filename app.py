@@ -1199,25 +1199,22 @@ def add_loading_service():
 # Manage Printing Services
 @app.route('/manage_printing_services')
 def manage_printing_services():
-    print_services = PrintService.query.all()  # Fetch all print services
-    paper_types = PaperType.query.all()        # Fetch all available paper types
-    
-    # Fetch current paper inventory for each paper type
+    print_services = PrintService.query.all()
+    paper_types = PaperType.query.all()
     paper_inventory = PaperInventory.query.all()
 
-    # Combine paper types with their inventory data
     paper_data = []
     for paper_type in paper_types:
         inventory = PaperInventory.query.filter_by(paper_type_id=paper_type.id).first()
         paper_data.append({
             'type': f"{paper_type.size} - {paper_type.description}",
-            'total_amount': inventory.rim_count if inventory else 0  # Default to 0 if no inventory found
+            'rim_count': inventory.rim_count if inventory else 0,
+            'individual_paper_count': inventory.individual_paper_count if inventory else 0
         })
     
     return render_template('manage_printing_services.html', 
                            print_services=print_services, 
-                           paper_inventory=paper_data  # Pass combined data to the template
-                           )
+                           paper_inventory=paper_data)
 
 # @app.route('/manage_printing_services')
 # def manage_printing_services():
@@ -1249,6 +1246,9 @@ def checkout_print_service():
         pages = request.form.get('pages')
         back_to_back = request.form.get('back_to_back') == '1'  # Checkbox returns '1' if checked
 
+        # Debugging
+        print(f"Service ID: {service_id}, Pages: {pages}, Back-to-back: {back_to_back}")
+
         if not service_id or not pages:
             flash('Missing service ID or number of pages.', 'danger')
             return redirect(url_for('checkout_print_service'))
@@ -1259,19 +1259,28 @@ def checkout_print_service():
             flash('Invalid number of pages.', 'danger')
             return redirect(url_for('checkout_print_service'))
 
+        # Adjust page count if back-to-back is selected (halves the page usage)
+        if back_to_back:
+            pages = max(1, pages // 2)
+        print(f"Adjusted Pages (after back-to-back): {pages}")
+
         # Fetch the selected print service
         print_service = PrintService.query.get(service_id)
 
         if not print_service:
             flash('Selected print service not found.', 'danger')
             return redirect(url_for('checkout_print_service'))
+        
+        print(f"Print Service: {print_service.service_type} at {print_service.price_per_page}/page")
 
         # Fetch inventory details (assuming ink and paper types are selected in the form)
         ink_type_id = request.form.get('ink_type_id')
         ink_usage = request.form.get('ink_usage')
         paper_type_id = request.form.get('paper_type_id')
 
-        # Only validate ink usage if it's relevant (e.g., if ink_type_id is provided)
+        # Debugging ink details
+        print(f"Ink Type ID: {ink_type_id}, Ink Usage: {ink_usage}")
+
         if ink_type_id and ink_usage:
             try:
                 ink_usage = float(ink_usage)
@@ -1286,6 +1295,9 @@ def checkout_print_service():
             if not ink_inventory:
                 flash('Selected ink type not found.', 'danger')
                 return redirect(url_for('checkout_print_service'))
+
+            # Debug ink inventory
+            print(f"Ink Inventory: {ink_inventory.stock} remaining, Usage: {ink_usage}")
 
             # Check if there is sufficient ink stock
             if ink_inventory.stock < ink_usage:
@@ -1308,28 +1320,47 @@ def checkout_print_service():
             flash('Selected paper type not found.', 'danger')
             return redirect(url_for('checkout_print_service'))
 
-        # Check if there is sufficient paper stock
-        if paper_inventory.individual_paper_count < pages:
-            flash('Not enough paper in stock!', 'danger')
-            return redirect(url_for('checkout_print_service'))
+        # Debug paper inventory
+        print(f"Paper Inventory: {paper_inventory.individual_paper_count} individual sheets, {paper_inventory.rim_count} rims")
 
-        # Deduct paper stock after the print job
+        # Check if there is sufficient paper stock in individual sheets
+        if paper_inventory.individual_paper_count < pages:
+            needed_sheets = pages - paper_inventory.individual_paper_count
+
+            if paper_inventory.rim_count > 0:
+                # Convert rim into individual papers (assuming 500 sheets per rim)
+                while needed_sheets > 0 and paper_inventory.rim_count > 0:
+                    paper_inventory.rim_count -= 1
+                    paper_inventory.individual_paper_count += 500
+                    needed_sheets = pages - paper_inventory.individual_paper_count
+
+            # Final check after converting rim to individual papers
+            if paper_inventory.individual_paper_count < pages:
+                flash('Not enough paper in stock after converting rims!', 'danger')
+                return redirect(url_for('checkout_print_service'))
+
+        # Deduct paper stock
         paper_inventory.individual_paper_count -= pages
 
         # Calculate the cost of ink and paper used (only if ink is relevant)
-        paper_cost_per_sheet = paper_inventory.amount_spent / (paper_inventory.rim_count * 500)  # Assuming 500 sheets per rim
-        ink_cost_per_ml = (ink_inventory.amount_spent / ink_inventory.initial_stock) if ink_type_id else 0  # If ink is relevant
+        paper_cost_per_sheet = paper_inventory.amount_spent / ((paper_inventory.rim_count * 500) + paper_inventory.individual_paper_count)
+        ink_cost_per_ml = (ink_inventory.amount_spent / ink_inventory.initial_stock) if ink_type_id else 0
         total_cost = (paper_cost_per_sheet * pages) + (ink_cost_per_ml * (ink_usage if ink_usage else 0))
+
+        # Debug total cost
+        print(f"Total cost of resources: {total_cost}")
 
         # Calculate the total price
         total_price = print_service.price_per_page * pages
 
         # Handle back-to-back discount (if applicable, e.g., 10% discount)
         if back_to_back:
-            total_price *= 0.9  # Apply a discount for back-to-back printing
+            total_price *= 0.9
 
-        # Calculate profit
+        # Debugging price and profit
+        print(f"Total Price: {total_price}")
         profit = total_price - total_cost
+        print(f"Profit: {profit}")
 
         # Commit inventory changes to the database
         db.session.commit()
@@ -1537,12 +1568,12 @@ def manage_loading_restock_events():
 @app.route('/add-restock', methods=['POST'])
 def add_restock():
     # Extract form data
-    restock_amount = float(request.form['restock_amount'])
-    restock_location = request.form['restock_location']
-    amount_spent = float(request.form['amount_spent'])
-    restock_type = request.form['restock_type']
+    restock_amount = float(request.form['restock_amount'])  # Amount of rims for paper or units for ink
+    restock_location = request.form['restock_location']  # Store or location from where it was restocked
+    amount_spent = float(request.form['amount_spent'])  # Cost of the restock
+    restock_type = request.form['restock_type']  # Type of item being restocked (ink, paper, load, gcash)
 
-    # Create a new Restock entry to log the event
+    # Create a new Restock entry
     new_restock = Restock(
         restock_amount=restock_amount,
         restock_location=restock_location,
@@ -1552,9 +1583,38 @@ def add_restock():
     )
     db.session.add(new_restock)
 
+    # Handle paper restock
+    if restock_type == 'paper':
+        paper_type_id = request.form.get('paper_type_id')  # Paper type selected
+
+        if not paper_type_id:
+            flash('Please select a paper type!', 'danger')
+            return redirect(url_for('manage_restock_events'))
+
+        # Fetch the paper inventory by paper_type_id
+        paper_inventory = PaperInventory.query.filter_by(paper_type_id=paper_type_id).first()
+
+        # Update or create a paper inventory entry
+        if paper_inventory:
+            # Update the existing paper inventory
+            paper_inventory.rim_count += restock_amount  # Adding restocked rims
+            paper_inventory.individual_paper_count += restock_amount * 500  # Adding the total sheets
+            paper_inventory.amount_spent += amount_spent  # Updating total amount spent
+            paper_inventory.last_restock_date = datetime.utcnow()  # Updating last restock date
+        else:
+            # Create a new paper inventory entry
+            paper_inventory = PaperInventory(
+                rim_count=restock_amount,  # Set initial rim count
+                individual_paper_count=restock_amount * 500,  # Set total sheets based on rim count (500 sheets per rim)
+                amount_spent=amount_spent,
+                paper_type_id=paper_type_id,  # Set the selected paper type
+                location_id=restock_location  # Set restock location
+            )
+            db.session.add(paper_inventory)
+
     # Handle ink restock
-    if restock_type == 'ink':
-        ink_type_id = request.form['ink_type_id']
+    elif restock_type == 'ink':
+        ink_type_id = request.form['ink_type_id']  # Selected ink type
         ink_inventory = InkInventory.query.get(ink_type_id)
 
         if ink_inventory:
@@ -1573,40 +1633,8 @@ def add_restock():
             )
             db.session.add(ink_inventory)
 
-    # Handle paper restock
-    # Handle paper restock
-    elif restock_type == 'paper':
-        paper_type_id = request.form.get('paper_type_id')
-        
-        if not paper_type_id:
-            flash('Please select a paper type!', 'danger')
-            return redirect(url_for('manage_restock_events'))
-
-        # Use restock_location here
-        restock_location = request.form.get('restock_location')
-
-        # Fetch the paper inventory by paper_type_id
-        paper_inventory = PaperInventory.query.filter_by(paper_type_id=paper_type_id).first()
-        
-        if paper_inventory:
-            # Update the existing paper inventory
-            paper_inventory.rim_count += restock_amount
-            paper_inventory.amount_spent += amount_spent
-            paper_inventory.last_restock_date = datetime.utcnow()
-        else:
-            # Create a new paper inventory entry
-            paper_inventory = PaperInventory(
-                rim_count=restock_amount,
-                individual_paper_count=restock_amount * 500,  # Assuming 500 sheets per rim
-                amount_spent=amount_spent,
-                paper_type_id=paper_type_id,
-                location_id=restock_location  # Ensure restock location is used here
-            )
-            db.session.add(paper_inventory)
-
     # Handle load and GCash restocks
     elif restock_type in ['load', 'gcash']:
-        # Create or update load balances
         load_balance = LoadBalance.query.first()
 
         if load_balance is None:
@@ -1614,7 +1642,6 @@ def add_restock():
             db.session.add(load_balance)
             db.session.commit()
 
-        # Update load or GCash balance
         if restock_type == 'load':
             load_balance.normal_load += restock_amount
         elif restock_type == 'gcash':
@@ -1625,6 +1652,7 @@ def add_restock():
 
     flash('Restock added successfully!', 'success')
     return redirect(url_for('manage_restock_events'))
+
 
 
 
