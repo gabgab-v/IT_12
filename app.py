@@ -1202,6 +1202,7 @@ def manage_printing_services():
     print_services = PrintService.query.all()
     paper_types = PaperType.query.all()
     paper_inventory = PaperInventory.query.all()
+    ink_inventory = InkInventory.query.all() 
 
     paper_data = []
     for paper_type in paper_types:
@@ -1214,7 +1215,8 @@ def manage_printing_services():
     
     return render_template('manage_printing_services.html', 
                            print_services=print_services, 
-                           paper_inventory=paper_data)
+                           paper_inventory=paper_data,
+                           ink_inventory=ink_inventory)
 
 # @app.route('/manage_printing_services')
 # def manage_printing_services():
