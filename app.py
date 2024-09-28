@@ -1528,9 +1528,10 @@ def manage_restock_events():
     ink_inventory = InkInventory.query.all()
     paper_inventory = PaperInventory.query.all()
     paper_types = PaperType.query.all()
+    products = Product.query.all()
     locations = Location.query.all()
     return render_template('manage_restock_events.html', restock_events=restock_events,ink_inventory=ink_inventory, paper_inventory=paper_inventory, 
-                           paper_types=paper_types, locations=locations)
+                           paper_types=paper_types,products=products, locations=locations)
 
 
 @app.route('/add_loading_restock', methods=['GET', 'POST'])
@@ -1584,6 +1585,35 @@ def add_restock():
         restock_date=datetime.utcnow()
     )
     db.session.add(new_restock)
+
+    # Handle product restock
+    if restock_type == 'product':
+        product_id = request.form['product_id']  # Product ID from the autocomplete field
+        price = float(request.form['price'])  # Product price
+        original_price = float(request.form['original_price'])  # Original price
+        category_id = request.form.get('category_id')  # Product category
+
+        # Fetch the existing product by product_id
+        existing_product = Product.query.get(product_id)
+
+        if existing_product:
+            # Update existing product stock
+            existing_product.stock += restock_amount
+            existing_product.last_restock_date = datetime.utcnow()
+            existing_product.price = price
+            existing_product.original_price = original_price
+        else:
+            # Create a new product if it doesn't exist
+            new_product = Product(
+                id=product_id,  # Use the provided product_id
+                price=price,
+                original_price=original_price,
+                stock=restock_amount,
+                purchase_location=restock_location,
+                category_id=category_id,  # Link to category
+                last_restock_date=datetime.utcnow()
+            )
+            db.session.add(new_product)
 
     # Handle paper restock
     if restock_type == 'paper':
@@ -1654,8 +1684,6 @@ def add_restock():
 
     flash('Restock added successfully!', 'success')
     return redirect(url_for('manage_restock_events'))
-
-
 
 
 @app.route('/logout')
