@@ -18,6 +18,8 @@
             <thead>
                 <tr>
                     <th>ID</th>
+                    <th>Product Name</th>
+                    <th>Category</th>
                     <th>Restock Amount</th>
                     <th>Amount Spent</th>
                     <th>Restock Location</th>
@@ -29,6 +31,8 @@
                 {% for restock in restock_events %}
                 <tr>
                     <td>{{ restock.id }}</td>
+                    <td>{{ restock.product.name if restock.product else 'N/A' }}</td>
+                    <td>{{ restock.product.category.name if restock.product and restock.product.category else 'N/A' }}</td>
                     <td>{{ restock.restock_amount }}</td>
                     <td>{{ restock.amount_spent }}</td>
                     <td>{{ restock.restock_location }}</td>
