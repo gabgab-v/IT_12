@@ -431,6 +431,30 @@ def manage_products():
     products = Product.query.filter_by(is_voided=False, deleted=False).all()
     return render_template('manage_products.html', products=products)
 
+# Route to display the restock form
+@app.route('/product/<int:product_id>/restock', methods=['GET', 'POST'])
+def restock_product(product_id):
+    product = Product.query.get_or_404(product_id)
+    
+    if request.method == 'POST':
+        # Get form data
+        restock_amount = int(request.form['restock_amount'])
+        amount_spent = float(request.form['amount_spent'])
+        restock_location = request.form['restock_location']
+
+        # Update product stock
+        product.stock += restock_amount
+        product.purchase_location = restock_location
+        db.session.commit()
+
+        flash(f'Successfully restocked {product.name} by {restock_amount} units!', 'success')
+        return redirect(url_for('manage_products'))  # Redirect to the manage products page
+    
+    # Render the restock form with the selected product
+    return render_template('product_restock.html', product=product)
+
+
+
 
 #VOIDING PRODUCTS
 @app.route('/void_product/<int:product_id>', methods=['POST'])
@@ -1585,35 +1609,6 @@ def add_restock():
         restock_date=datetime.utcnow()
     )
     db.session.add(new_restock)
-
-    # Handle product restock
-    if restock_type == 'product':
-        product_id = request.form['product_id']  # Product ID from the autocomplete field
-        price = float(request.form['price'])  # Product price
-        original_price = float(request.form['original_price'])  # Original price
-        category_id = request.form.get('category_id')  # Product category
-
-        # Fetch the existing product by product_id
-        existing_product = Product.query.get(product_id)
-
-        if existing_product:
-            # Update existing product stock
-            existing_product.stock += restock_amount
-            existing_product.last_restock_date = datetime.utcnow()
-            existing_product.price = price
-            existing_product.original_price = original_price
-        else:
-            # Create a new product if it doesn't exist
-            new_product = Product(
-                id=product_id,  # Use the provided product_id
-                price=price,
-                original_price=original_price,
-                stock=restock_amount,
-                purchase_location=restock_location,
-                category_id=category_id,  # Link to category
-                last_restock_date=datetime.utcnow()
-            )
-            db.session.add(new_product)
 
     # Handle paper restock
     if restock_type == 'paper':

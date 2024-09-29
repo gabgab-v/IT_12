@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restock Product</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+</head>
+<body>
+    <div class="container mt-5">
+        <h2>Restock {{ product.name }}</h2>
+        <form action="{{ url_for('restock_product', product_id=product.id) }}" method="POST">
+            <!-- Restock Amount -->
+            <div class="form-group">
+                <label for="restock_amount">Restock Amount</label>
+                <input type="number" class="form-control" id="restock_amount" name="restock_amount" placeholder="Enter restock amount" required>
+            </div>
+
+            <!-- Amount Spent -->
+            <div class="form-group">
+                <label for="amount_spent">Amount Spent</label>
+                <input type="number" class="form-control" id="amount_spent" name="amount_spent" placeholder="Enter amount spent" required>
+            </div>
+
+            <!-- Restock Location -->
+            <div class="form-group">
+                <label for="restock_location">Restock Location</label>
+                <input type="text" class="form-control" id="restock_location" name="restock_location" placeholder="Enter restock location" required>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" class="btn btn-primary">Restock Product</button>
+        </form>
+
+        <a href="{{ url_for('manage_products') }}" class="btn btn-secondary mt-3">Back to Products</a>
+    </div>
+</body>
+</html>

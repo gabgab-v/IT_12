@@ -24,7 +24,7 @@
                     <th>Store Price</th>
                     <th>Original Price</th>
                     <th>Purchase Location</th>
-                    <th>Expiration Date</th> <!-- New Column for Expiration Date -->
+                    <th>Expiration Date</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -39,8 +39,9 @@
                     <td>{{ product.price }}</td>
                     <td>{{ product.original_price }}</td>
                     <td>{{ product.purchase_location }}</td>
-                    <td>{{ product.expiration_date if product.expiration_date else 'N/A' }}</td> <!-- Display Expiration Date -->
+                    <td>{{ product.expiration_date if product.expiration_date else 'N/A' }}</td>
                     <td>
+                        <!-- Edit Product -->
                         <a href="{{ url_for('edit_product', product_id=product.id) }}" class="btn btn-warning btn-sm">Edit</a>
                         
                         <!-- Remove Product -->
@@ -53,6 +54,9 @@
                             <input type="number" name="reduce_quantity" min="1" max="{{ product.stock }}" placeholder="Qty" class="form-control form-control-sm d-inline-block w-50 mb-2">
                             <button type="submit" class="btn btn-dark btn-sm" onclick="return confirm('Are you sure you want to reduce the stock of this product?');">Void</button>
                         </form>
+
+                        <!-- Restock Button -->
+                        <a href="{{ url_for('restock_product', product_id=product.id) }}" class="btn btn-primary btn-sm">Restock</a>
                     </td>
                 </tr>
                 {% endfor %}

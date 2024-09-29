@@ -58,7 +58,6 @@
                             <label for="restock_type">Restock Type</label>
                             <select class="form-control" id="restock_type" name="restock_type" required onchange="showInventoryFields()">
                                 <option value="">Select Restock Type</option>
-                                <option value="product">Product</option>
                                 <option value="ink">Ink</option>
                                 <option value="paper">Paper</option>
                                 <option value="load">Load</option>
@@ -100,23 +99,6 @@
                                 {% endfor %}
                             </select>
                         </div>
-
-                        <!-- Autocomplete and Searchable Dropdown for Product -->
-                        <div class="form-group" id="product-search-field" style="display: none;">
-                            <label for="product_name">Search Product</label>
-                            <input type="text" class="form-control" id="product_name" name="product_name" placeholder="Type product name" required>
-                            <input type="hidden" id="product_id_hidden" name="product_id_hidden"> <!-- Hidden input to store product ID -->
-                        </div>
-
-                        <div class="form-group" id="product-select-field" style="display: none;">
-                            <label for="product_id">Select Product</label>
-                            <select class="form-control" id="product_id" name="product_id" required>
-                                <option value="">Search or select product</option>
-                                {% for product in products %}
-                                    <option value="{{ product.id }}">{{ product.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
                     </div>
 
                     <div class="modal-footer">
@@ -139,47 +121,17 @@
             const restockType = document.getElementById('restock_type').value;
             const inkField = document.getElementById('ink-type-field');
             const paperField = document.getElementById('paper-type-field');
-            const productSearchField = document.getElementById('product-search-field');
-            const productSelectField = document.getElementById('product-select-field');
 
             // Hide all fields initially
             inkField.style.display = 'none';
             paperField.style.display = 'none';
-            productSearchField.style.display = 'none';
-            productSelectField.style.display = 'none';
 
             if (restockType === 'ink') {
                 inkField.style.display = 'block';
             } else if (restockType === 'paper') {
                 paperField.style.display = 'block';
-            } else if (restockType === 'product') {
-                productSearchField.style.display = 'block';
-                productSelectField.style.display = 'block';
             }
         }
-
-        // Initialize Select2
-        $(document).ready(function() {
-            $('#product_id').select2({
-                placeholder: 'Search for a product',
-                allowClear: true
-            });
-
-            var products = [
-                {% for product in products %}
-                    { label: "{{ product.name }}", value: "{{ product.id }}" },
-                {% endfor %}
-            ];
-
-            $("#product_name").autocomplete({
-                source: products,
-                select: function(event, ui) {
-                    $("#product_name").val(ui.item.label);  // Display product name
-                    $("#product_id_hidden").val(ui.item.value);  // Store product ID in hidden field
-                    return false;
-                }
-            });
-        });
     </script>
 
 </body>
