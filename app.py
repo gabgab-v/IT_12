@@ -217,13 +217,22 @@ class Restock(db.Model):
     restock_date = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
     amount_spent = db.Column(db.Float, nullable=False)  # Total cost of the restock
     restock_location = db.Column(db.String(100), nullable=False)  # Where the items were restocked
-    
-    # Foreign key to track which inventory this restock applies to (either ink or paper)
-    inventory_id = db.Column(db.Integer, db.ForeignKey('ink_inventory.id'), nullable=True)
-    inventory_type = db.Column(db.String(20), nullable=False)  # 'ink' or 'paper'
+
+    # Foreign keys for both ink, paper, and product inventories, only one will be filled based on restock type
+    ink_inventory_id = db.Column(db.Integer, db.ForeignKey('ink_inventory.id'), nullable=True)
+    paper_inventory_id = db.Column(db.Integer, db.ForeignKey('paper_inventory.id'), nullable=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=True)
+
+    # Type of inventory being restocked (either 'ink', 'paper', or 'product')
+    inventory_type = db.Column(db.String(20), nullable=False)  # 'ink', 'paper', 'product'
+
+    # Relationships to InkInventory, PaperInventory, and Product models
+    ink_inventory = db.relationship('InkInventory', backref=db.backref('restocks', lazy=True))
+    paper_inventory = db.relationship('PaperInventory', backref=db.backref('restocks', lazy=True))
+    product = db.relationship('Product', backref=db.backref('restocks', lazy=True))
 
     def __repr__(self):
-        return f"Restock('{self.restock_amount}', '{self.restock_date}', '{self.amount_spent}', '{self.restock_location}')"
+        return f"Restock('{self.restock_amount}', '{self.restock_date}', '{self.amount_spent}', '{self.restock_location}', '{self.inventory_type}')"
 
 
 class PaperType(db.Model):
@@ -431,11 +440,11 @@ def manage_products():
     products = Product.query.filter_by(is_voided=False, deleted=False).all()
     return render_template('manage_products.html', products=products)
 
-# Route to display the restock form
+# Route to display the restock form and log restocks
 @app.route('/product/<int:product_id>/restock', methods=['GET', 'POST'])
 def restock_product(product_id):
     product = Product.query.get_or_404(product_id)
-    
+
     if request.method == 'POST':
         # Get form data
         restock_amount = int(request.form['restock_amount'])
@@ -445,15 +454,26 @@ def restock_product(product_id):
         # Update product stock
         product.stock += restock_amount
         product.purchase_location = restock_location
+
+        # Log the restock event
+        restock = Restock(
+            restock_amount=restock_amount,
+            amount_spent=amount_spent,
+            restock_location=restock_location,
+            product_id=product.id,
+            inventory_type='product'
+        )
+        db.session.add(restock)
         db.session.commit()
 
         flash(f'Successfully restocked {product.name} by {restock_amount} units!', 'success')
-        return redirect(url_for('manage_products'))  # Redirect to the manage products page
-    
-    # Render the restock form with the selected product
-    return render_template('product_restock.html', product=product)
+        return redirect(url_for('restock_product', product_id=product_id))  # Redirect to the same page to see the updated log
 
+    # Query restock log for this product
+    restock_log = Restock.query.filter_by(product_id=product_id).all()
 
+    # Render the restock form with the selected product and its restock log
+    return render_template('product_restock.html', product=product, restock_log=restock_log)
 
 
 #VOIDING PRODUCTS
