@@ -1036,8 +1036,10 @@ def chart_data():
 
 @app.route('/cashier', methods=['GET', 'POST'])
 def cashier():
+    print_services = PrintService.query.all()
+    paper_types = PaperInventory.query.all()
     products = Product.query.filter_by(deleted=False, is_voided=False).all()  # Fetch all valid products
-    return render_template('cashier.html', products=products)
+    return render_template('cashier.html', products=products, print_services=print_services, paper_types=paper_types)
 
 @app.route('/checkout', methods=['POST'])
 @login_required
@@ -1319,41 +1321,9 @@ def checkout_print_service():
         
         print(f"Print Service: {print_service.service_type} at {print_service.price_per_page}/page")
 
-        # Fetch inventory details (assuming ink and paper types are selected in the form)
-        ink_type_id = request.form.get('ink_type_id')
-        ink_usage = request.form.get('ink_usage')
+        # Fetch paper inventory details
         paper_type_id = request.form.get('paper_type_id')
 
-        # Debugging ink details
-        print(f"Ink Type ID: {ink_type_id}, Ink Usage: {ink_usage}")
-
-        if ink_type_id and ink_usage:
-            try:
-                ink_usage = float(ink_usage)
-            except ValueError:
-                flash('Invalid ink usage value.', 'danger')
-                return redirect(url_for('checkout_print_service'))
-
-            # Get ink inventory
-            ink_inventory = InkInventory.query.filter_by(id=ink_type_id).first()
-
-            # Check if ink inventory exists
-            if not ink_inventory:
-                flash('Selected ink type not found.', 'danger')
-                return redirect(url_for('checkout_print_service'))
-
-            # Debug ink inventory
-            print(f"Ink Inventory: {ink_inventory.stock} remaining, Usage: {ink_usage}")
-
-            # Check if there is sufficient ink stock
-            if ink_inventory.stock < ink_usage:
-                flash('Not enough ink in stock!', 'danger')
-                return redirect(url_for('checkout_print_service'))
-
-            # Deduct ink stock after the print job
-            ink_inventory.stock -= ink_usage
-
-        # Validate paper inventory
         if not paper_type_id:
             flash('Paper type must be selected.', 'danger')
             return redirect(url_for('checkout_print_service'))
@@ -1388,10 +1358,9 @@ def checkout_print_service():
         # Deduct paper stock
         paper_inventory.individual_paper_count -= pages
 
-        # Calculate the cost of ink and paper used (only if ink is relevant)
+        # Calculate the cost of paper used
         paper_cost_per_sheet = paper_inventory.amount_spent / ((paper_inventory.rim_count * 500) + paper_inventory.individual_paper_count)
-        ink_cost_per_ml = (ink_inventory.amount_spent / ink_inventory.initial_stock) if ink_type_id else 0
-        total_cost = (paper_cost_per_sheet * pages) + (ink_cost_per_ml * (ink_usage if ink_usage else 0))
+        total_cost = paper_cost_per_sheet * pages
 
         # Debug total cost
         print(f"Total cost of resources: {total_cost}")
