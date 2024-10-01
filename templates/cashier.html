@@ -108,39 +108,47 @@
     </div>
 
     <!-- Print Service Transaction Modal -->
+    <!-- Print Service Transaction Modal -->
     <div class="modal fade" id="addPrintServiceModal" tabindex="-1" aria-labelledby="addPrintServiceModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form id="printServiceForm" method="POST" action="{{ url_for('checkout_print_service') }}">
+                <form id="printServiceForm" method="POST" action="{{ url_for('checkout_print_service') }}" onsubmit="console.log('Submitting form...');">
                     <div class="modal-header">
                         <h5 class="modal-title" id="addPrintServiceModalLabel">Add Print Service</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <!-- Input fields for Print Service -->
-                        <label for="service_id">Print Service:</label>
-                        <select id="service_id" name="service_id" class="form-control" required>
-                            {% for service in print_services %}
-                                <option value="{{ service.id }}">{{ service.service_type }} - P{{ service.price_per_page }} per page</option>
-                            {% endfor %}
-                        </select>
+                        <div class="form-group mb-3">
+                            <label for="service_id">Print Service</label>
+                            <select id="service_id" name="service_id" class="form-control" required>
+                                {% for service in print_services %}
+                                    <option value="{{ service.id }}">{{ service.service_type }} - P{{ service.price_per_page }} per page</option>
+                                {% endfor %}
+                            </select>
+                        </div>
 
-                        <label for="pages" class="mt-3">Number of Pages:</label>
-                        <input type="number" id="pages" name="pages" class="form-control" required>
+                        <div class="form-group mb-3">
+                            <label for="pages">Number of Pages</label>
+                            <input type="number" id="pages" name="pages" class="form-control" required>
+                        </div>
 
-                        <label for="paper_type_id" class="mt-3">Paper Type:</label>
-                        <select id="paper_type_id" name="paper_type_id" class="form-control" required>
-                            {% for paper in paper_types %}
-                                <option value="{{ paper.id }}">{{ paper.paper_type }} - P{{ paper.price_per_sheet }} per sheet</option>
-                            {% endfor %}
-                        </select>
+                        <div class="form-group mb-3">
+                            <label for="paper_type_id">Paper Type</label>
+                            <select id="paper_type_id" name="paper_type_id" class="form-control" required>
+                                {% for paper in paper_types %}
+                                    <option value="{{ paper.id }}">{{ paper.paper_type }} - P{{ paper.price_per_sheet }} per sheet</option>
+                                {% endfor %}
+                            </select>
+                        </div>
 
-                        <label for="back_to_back" class="mt-3">Back-to-Back Printing?</label>
-                        <input type="checkbox" id="back_to_back" name="back_to_back" value="1">
+                        <div class="form-group mb-3">
+                            <label for="back_to_back">Back-to-Back Printing?</label>
+                            <input type="checkbox" id="back_to_back" name="back_to_back" value="1" class="form-check-input">
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary">Add Print Service</button>
+                        <button type="submit" class="btn btn-primary">Submit</button>
                     </div>
                 </form>
             </div>
@@ -199,7 +207,52 @@
     let totalAmount = 0;
     let unitsCount = 0;
 
-    // Add product to the cart
+    // General function for adding items (both products and services)
+    function addToCart(itemName, itemPrice, itemQuantity, itemTotalPrice, isService = false) {
+        const productTable = document.getElementById('productTableBody');
+        const newRow = productTable.insertRow();
+        newRow.innerHTML = `
+            <td>${itemName}</td>
+            <td>P ${itemPrice.toFixed(2)}</td>
+            <td>${itemQuantity}</td>
+            <td>P ${itemTotalPrice.toFixed(2)}</td>
+        `;
+
+        totalAmount += itemTotalPrice;
+        unitsCount += itemQuantity;
+
+        document.getElementById('totalAmount').textContent = `P ${totalAmount.toFixed(2)}`;
+        document.getElementById('unitsCount').textContent = unitsCount;
+
+        const checkoutForm = document.getElementById('checkoutForm');
+
+        // Hidden inputs for form submission
+        const nameInput = document.createElement('input');
+        nameInput.type = 'hidden';
+        nameInput.name = isService ? 'service_names[]' : 'product_names[]';
+        nameInput.value = itemName;
+        checkoutForm.appendChild(nameInput);
+
+        const quantityInput = document.createElement('input');
+        quantityInput.type = 'hidden';
+        quantityInput.name = isService ? 'service_quantities[]' : 'product_quantities[]';
+        quantityInput.value = itemQuantity;
+        checkoutForm.appendChild(quantityInput);
+
+        const priceInput = document.createElement('input');
+        priceInput.type = 'hidden';
+        priceInput.name = isService ? 'service_prices[]' : 'product_prices[]';
+        priceInput.value = itemPrice;
+        checkoutForm.appendChild(priceInput);
+
+        const totalPriceInput = document.createElement('input');
+        totalPriceInput.type = 'hidden';
+        totalPriceInput.name = isService ? 'service_totals[]' : 'product_totals[]';
+        totalPriceInput.value = itemTotalPrice;
+        checkoutForm.appendChild(totalPriceInput);
+    }
+
+    // Product form submission
     document.getElementById('productForm').addEventListener('submit', function(event) {
         event.preventDefault();
 
@@ -208,164 +261,40 @@
         const quantity = parseInt(document.getElementById('quantity').value);
 
         if (quantity > stock) {
-            alert('Insufficient stock for this product!');
+            alert('Not enough stock');
             return;
         }
 
-        // Get product details
-        const productId = productSelect.value;
         const productName = productSelect.options[productSelect.selectedIndex].text.split(" (")[0];
         const productPrice = parseFloat(productSelect.options[productSelect.selectedIndex].getAttribute('data-price'));
         const totalPrice = productPrice * quantity;
 
-        // Add product details to the table
-        const productTable = document.getElementById('productTableBody');
-        const newRow = productTable.insertRow();
-        newRow.innerHTML = `
-            <td>${productName}</td>
-            <td>P ${productPrice.toFixed(2)}</td>
-            <td>${quantity}</td>
-            <td>P ${totalPrice.toFixed(2)}</td>
-        `;
-
-        // Update totals
-        totalAmount += totalPrice;
-        unitsCount += quantity;
-
-        document.getElementById('totalAmount').textContent = `P ${totalAmount.toFixed(2)}`;
-        document.getElementById('unitsCount').textContent = unitsCount;
-
-        // Add product details to hidden checkout form
-        const checkoutForm = document.getElementById('checkoutForm');
-        const productInput = document.createElement('input');
-        productInput.type = 'hidden';
-        productInput.name = 'product_ids[]';
-        productInput.value = productId;
-        checkoutForm.appendChild(productInput);
-
-        const quantityInput = document.createElement('input');
-        quantityInput.type = 'hidden';
-        quantityInput.name = 'quantities[]';
-        quantityInput.value = quantity;
-        checkoutForm.appendChild(quantityInput);
+        addToCart(productName, productPrice, quantity, totalPrice);
     });
 
-        <!-- Add print service to the cart -->
-        document.getElementById('printServiceForm').addEventListener('submit', function(event) {
+    // Print service form submission
+    document.getElementById('printServiceForm').addEventListener('submit', function(event) {
         event.preventDefault();
 
-        // Get selected print service details
-        const serviceId = document.getElementById('service_id').value;
-        const serviceName = document.getElementById('service_id').options[document.getElementById('service_id').selectedIndex].text;
+        const serviceSelect = document.getElementById('service_id');
+        const serviceName = serviceSelect.options[serviceSelect.selectedIndex].text.split(" (")[0];
+        const serviceId = serviceSelect.value; // Service ID
+        const servicePrice = parseFloat(serviceSelect.options[serviceSelect.selectedIndex].text.match(/\d+/)[0]);
         const pages = parseInt(document.getElementById('pages').value);
-        const paperTypeId = document.getElementById('paper_type_id').value;
-        const paperTypeName = document.getElementById('paper_type_id').options[document.getElementById('paper_type_id').selectedIndex].text;
+
+        const paperTypeSelect = document.getElementById('paper_type_id');
+        const paperType = paperTypeSelect.options[paperTypeSelect.selectedIndex].text;
         const backToBack = document.getElementById('back_to_back').checked ? 'Yes' : 'No';
 
-        // Calculate price
-        const servicePrice = parseFloat(serviceName.split('P')[1].split(' ')[0]);
         const totalPrice = servicePrice * pages;
+        const fullServiceDescription = `${serviceName} (${paperType}, Back-to-Back: ${backToBack})`;
 
-        // Add to product list
-        const productTable = document.getElementById('productTableBody');
-        const newRow = productTable.insertRow();
-        newRow.innerHTML = `
-            <td>Print Service - ${serviceName} (${paperTypeName}, Back-to-Back: ${backToBack})</td>
-            <td>P ${servicePrice.toFixed(2)}</td>
-            <td>${pages}</td>
-            <td>P ${totalPrice.toFixed(2)}</td>
-        `;
+        addToCart(fullServiceDescription, servicePrice, pages, totalPrice, true, serviceId, pages);
 
-        // Update totals
-        totalAmount += totalPrice;
-        unitsCount += pages;
-
-        document.getElementById('totalAmount').textContent = `P ${totalAmount.toFixed(2)}`;
-        document.getElementById('unitsCount').textContent = unitsCount;
-
-        // Add print service details to hidden checkout form
-        const checkoutForm = document.getElementById('checkoutForm');
-
-        const serviceInput = document.createElement('input');
-        serviceInput.type = 'hidden';
-        serviceInput.name = 'service_ids[]';
-        serviceInput.value = serviceId;
-        checkoutForm.appendChild(serviceInput);
-
-        const pagesInput = document.createElement('input');
-        pagesInput.type = 'hidden';
-        pagesInput.name = 'pages[]';
-        pagesInput.value = pages;
-        checkoutForm.appendChild(pagesInput);
-
-        const paperTypeInput = document.createElement('input');
-        paperTypeInput.type = 'hidden';
-        paperTypeInput.name = 'paper_type_ids[]';
-        paperTypeInput.value = paperTypeId;
-        checkoutForm.appendChild(paperTypeInput);
-
-        const backToBackInput = document.createElement('input');
-        backToBackInput.type = 'hidden';
-        backToBackInput.name = 'back_to_back[]';
-        backToBackInput.value = backToBack;
-        checkoutForm.appendChild(backToBackInput);
-
-        // Close the modal
-        const printServiceModal = bootstrap.Modal.getInstance(document.getElementById('addPrintServiceModal'));
-        printServiceModal.hide();
+        const modalInstance = bootstrap.Modal.getInstance(document.getElementById('addPrintServiceModal'));
+        modalInstance.hide();
     });
 
-
-    // Add load transaction to the cart
-    document.getElementById('loadTransactionForm').addEventListener('submit', function(event) {
-        event.preventDefault();
-
-        const amountLoaded = parseFloat(document.getElementById('amount_loaded').value);
-        const serviceProvider = document.getElementById('service_provider').value;
-        const transactionTypeId = document.getElementById('transaction_type_id').value;
-
-        // Add load transaction details to the product list table
-        const productTable = document.getElementById('productTableBody');
-        const newRow = productTable.insertRow();
-        newRow.innerHTML = `
-            <td>Load - ${serviceProvider}</td>
-            <td>P ${amountLoaded.toFixed(2)}</td>
-            <td>1</td>
-            <td>P ${amountLoaded.toFixed(2)}</td>
-        `;
-
-        // Update totals
-        totalAmount += amountLoaded;
-        unitsCount += 1;
-
-        document.getElementById('totalAmount').textContent = `P ${totalAmount.toFixed(2)}`;
-        document.getElementById('unitsCount').textContent = unitsCount;
-
-        // Add load transaction details to hidden checkout form
-        const checkoutForm = document.getElementById('checkoutForm');
-
-        const loadAmountInput = document.createElement('input');
-        loadAmountInput.type = 'hidden';
-        loadAmountInput.name = 'load_amounts[]';
-        loadAmountInput.value = amountLoaded;
-        checkoutForm.appendChild(loadAmountInput);
-
-        const serviceProviderInput = document.createElement('input');
-        serviceProviderInput.type = 'hidden';
-        serviceProviderInput.name = 'service_providers[]';
-        serviceProviderInput.value = serviceProvider;
-        checkoutForm.appendChild(serviceProviderInput);
-
-        const transactionTypeInput = document.createElement('input');
-        transactionTypeInput.type = 'hidden';
-        transactionTypeInput.name = 'transaction_type_ids[]';
-        transactionTypeInput.value = transactionTypeId;
-        checkoutForm.appendChild(transactionTypeInput);
-
-        // Close the modal after submission
-        const loadModal = bootstrap.Modal.getInstance(document.getElementById('addLoadModal'));
-        loadModal.hide();
-    });
 </script>
 
 

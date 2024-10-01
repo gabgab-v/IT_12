@@ -1046,13 +1046,17 @@ def cashier():
 def checkout():
     product_ids = request.form.getlist('product_ids[]')
     quantities = request.form.getlist('quantities[]')
+    print_service_ids = request.form.getlist('print_service_ids[]')
+    pages_printed = request.form.getlist('pages_printed[]')
+
+    # Log incoming form data
+    print(f"Product IDs: {product_ids}, Quantities: {quantities}")
+    print(f"Print Service IDs: {print_service_ids}, Pages Printed: {pages_printed}")
 
     total_sales = 0
-
-    # Create a dictionary to hold aggregated product data
     product_dict = {}
 
-    # Aggregate quantities for the same product
+    # Aggregate product quantities
     for i in range(len(product_ids)):
         product_id = int(product_ids[i])
         quantity = int(quantities[i])
@@ -1067,29 +1071,24 @@ def checkout():
             flash(f'Insufficient stock for {product.name}', 'danger')
             return redirect(url_for('cashier'))
 
-        # If the product is already in the dictionary, update the quantity
+        # Aggregate quantities for the same product
         if product_id in product_dict:
             product_dict[product_id]['quantity'] += quantity
         else:
-            # Add new product entry with initial quantity
             product_dict[product_id] = {
                 'product': product,
                 'quantity': quantity,
                 'total_price': product.price * quantity
             }
 
-    # Process all products in the product_dict
+    # Process aggregated products
     for product_id, product_data in product_dict.items():
         product = product_data['product']
         quantity = product_data['quantity']
 
-        # Deduct the aggregated quantity from stock
         product.stock -= quantity
-
-        # Add to total sales
         total_sales += product.price * quantity
 
-        # Create a single transaction for the aggregated quantity
         new_transaction = Transaction(
             product_id=product.id,
             user_id=current_user.id,
@@ -1098,15 +1097,53 @@ def checkout():
         )
         db.session.add(new_transaction)
 
+    # Process print services
+    if print_service_ids:
+        for i in range(len(print_service_ids)):
+            print_service_id = int(print_service_ids[i])
+            pages = int(pages_printed[i])
+
+            print_service = PrintService.query.get(print_service_id)
+            print(f"Processing Print Service ID: {print_service_id}, Found: {print_service}")
+
+            if not print_service:
+                flash(f'Print service with ID {print_service_id} does not exist!', 'danger')
+                return redirect(url_for('cashier'))
+
+            paper = PaperInventory.query.filter_by(paper_type='A4').first()
+            print(f"Paper Inventory for A4: {paper}, Current Stock: {paper.stock}")
+
+            if pages > paper.stock:
+                flash('Not enough paper stock for this transaction!', 'danger')
+                return redirect(url_for('cashier'))
+
+            # Deduct paper stock
+            paper.stock -= pages
+            print(f"Deducting {pages} pages, Remaining Stock: {paper.stock}")
+
+            total_price = print_service.price_per_page * pages
+            total_sales += total_price
+
+            new_print_transaction = Transaction(
+                print_service_id=print_service.id,
+                user_id=current_user.id,
+                quantity=pages,
+                total_price=total_price,
+            )
+            print(f"Creating Print Transaction: {new_print_transaction}")
+            db.session.add(new_print_transaction)
+
+    # Commit changes
     try:
         db.session.commit()
+        print(f"Transaction committed successfully. Total Sales: {total_sales}")
         flash(f'Transaction completed successfully! Total Sales: P{total_sales:.2f}', 'success')
     except Exception as e:
+        print(f"Error during commit: {e}")
         db.session.rollback()
         flash(f'Error processing checkout: {e}', 'danger')
 
     return redirect(url_for('cashier'))
-
 
 # Manage Loading Services
 @app.route('/manage_loading_services')
@@ -1297,6 +1334,7 @@ def checkout_print_service():
         # Debugging
         print(f"Service ID: {service_id}, Pages: {pages}, Back-to-back: {back_to_back}")
 
+        # Validate service_id and pages
         if not service_id or not pages:
             flash('Missing service ID or number of pages.', 'danger')
             return redirect(url_for('checkout_print_service'))
@@ -1307,50 +1345,42 @@ def checkout_print_service():
             flash('Invalid number of pages.', 'danger')
             return redirect(url_for('checkout_print_service'))
 
-        # Adjust page count if back-to-back is selected (halves the page usage)
+        # Adjust page count for back-to-back printing
         if back_to_back:
             pages = max(1, pages // 2)
         print(f"Adjusted Pages (after back-to-back): {pages}")
 
         # Fetch the selected print service
         print_service = PrintService.query.get(service_id)
-
         if not print_service:
             flash('Selected print service not found.', 'danger')
             return redirect(url_for('checkout_print_service'))
-        
+
         print(f"Print Service: {print_service.service_type} at {print_service.price_per_page}/page")
 
-        # Fetch paper inventory details
+        # Fetch paper type selection
         paper_type_id = request.form.get('paper_type_id')
-
         if not paper_type_id:
             flash('Paper type must be selected.', 'danger')
             return redirect(url_for('checkout_print_service'))
 
-        # Get paper inventory
+        # Get paper inventory based on paper_type_id
         paper_inventory = PaperInventory.query.filter_by(id=paper_type_id).first()
-
-        # Check if paper inventory exists
         if not paper_inventory:
             flash('Selected paper type not found.', 'danger')
             return redirect(url_for('checkout_print_service'))
 
-        # Debug paper inventory
         print(f"Paper Inventory: {paper_inventory.individual_paper_count} individual sheets, {paper_inventory.rim_count} rims")
 
-        # Check if there is sufficient paper stock in individual sheets
+        # Check for sufficient stock in individual sheets and rims
         if paper_inventory.individual_paper_count < pages:
             needed_sheets = pages - paper_inventory.individual_paper_count
+            while needed_sheets > 0 and paper_inventory.rim_count > 0:
+                paper_inventory.rim_count -= 1
+                paper_inventory.individual_paper_count += 500  # Add 500 sheets from a rim
+                needed_sheets = pages - paper_inventory.individual_paper_count
 
-            if paper_inventory.rim_count > 0:
-                # Convert rim into individual papers (assuming 500 sheets per rim)
-                while needed_sheets > 0 and paper_inventory.rim_count > 0:
-                    paper_inventory.rim_count -= 1
-                    paper_inventory.individual_paper_count += 500
-                    needed_sheets = pages - paper_inventory.individual_paper_count
-
-            # Final check after converting rim to individual papers
+            # Check if there is still insufficient paper after conversion
             if paper_inventory.individual_paper_count < pages:
                 flash('Not enough paper in stock after converting rims!', 'danger')
                 return redirect(url_for('checkout_print_service'))
@@ -1358,49 +1388,48 @@ def checkout_print_service():
         # Deduct paper stock
         paper_inventory.individual_paper_count -= pages
 
-        # Calculate the cost of paper used
-        paper_cost_per_sheet = paper_inventory.amount_spent / ((paper_inventory.rim_count * 500) + paper_inventory.individual_paper_count)
+        # Safeguard for paper cost calculation (avoid division by zero)
+        total_sheets = (paper_inventory.rim_count * 500) + paper_inventory.individual_paper_count
+        if total_sheets > 0:
+            paper_cost_per_sheet = paper_inventory.amount_spent / total_sheets
+        else:
+            paper_cost_per_sheet = 0  # Handle the case where no paper cost is available
         total_cost = paper_cost_per_sheet * pages
 
-        # Debug total cost
         print(f"Total cost of resources: {total_cost}")
 
-        # Calculate the total price
+        # Calculate total price for the print job
         total_price = print_service.price_per_page * pages
 
-        # Handle back-to-back discount (if applicable, e.g., 10% discount)
+        # Apply back-to-back discount if applicable
         if back_to_back:
-            total_price *= 0.9
+            total_price *= 0.9  # Example: 10% discount for back-to-back printing
 
-        # Debugging price and profit
         print(f"Total Price: {total_price}")
         profit = total_price - total_cost
         print(f"Profit: {profit}")
 
-        # Commit inventory changes to the database
+        # Commit paper inventory changes to the database
         db.session.commit()
 
-        # Create the print transaction in the unified Transaction table
+        # Create the print transaction
         new_transaction = Transaction(
-            user_id=current_user.id,  # Assuming you are using Flask-Login for user authentication
+            user_id=current_user.id,  # Assuming Flask-Login for user authentication
             total_price=total_price,
             print_service_id=print_service.id,
             pages=pages,
             back_to_back=back_to_back
         )
-
-        # Add the new transaction to the Transaction table
         db.session.add(new_transaction)
         db.session.commit()
 
         flash(f'Print service checkout successful! Total price: P{total_price}', 'success')
         return redirect(url_for('checkout_print_service'))
 
-    # Query all print services to show in the form
+    # Query all print services and paper types to show in the form
     print_services = PrintService.query.all()
     paper_types = PaperInventory.query.all()
     return render_template('check_print_service.html', print_services=print_services, paper_types=paper_types)
-
 
 # Route for adding new ink type
 @app.route('/add-ink-type', methods=['POST'])
